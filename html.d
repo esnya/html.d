@@ -103,6 +103,7 @@ class HTMLParseError : Exception {
 }
 
 /// パース
+///     SeeAlso: http://momdo.github.io/html5/syntax.html
 HTMLElement parseHTML(S)(S html) if (isInputRange!S && is(ElementType!S == dchar)) {
     HTMLElement root;
     HTMLElement p;
@@ -118,6 +119,46 @@ HTMLElement parseHTML(S)(S html) if (isInputRange!S && is(ElementType!S == dchar
         return name.data.toUTF8();
     }
 
+    auto parseAttributeKey() {
+        auto key = appender!(ElementType!S[]);
+        while (!html.front.isWhite && html.front != '=' && html.front != '>') {  // 空白文字か "=" タグ終了まで属性名
+            if (canFind(['\0', '"', '\'', '>', '/', '='], html.front) || html.front.isControl || html.front.isWhite) {    // 不正な属性名
+                throw new HTMLParseError((`Unexcepted character: ` ~ html.take(10).array.toUTF8()).idup);
+            }
+            key.put(html.front);
+            html.popFront();
+        }
+        return key.data.toUTF8();
+    }
+
+    auto parseAttributeValue() {
+        auto value = appender!(ElementType!S[]);
+
+        ElementType!S dem = 0;
+        if (html.front == '"' || html.front == '\'') {
+            dem = html.front;
+            html.popFront();
+        }
+
+        while ((dem || !html.front.isWhite) && html.front != '>' && (!dem || html.front != dem)) {  // 空白文字かタグ終了かdemまで属性名
+            if (canFind(['\0', '"', '\'', '>', '/', '='], html.front) || html.front.isControl || (!dem && html.front.isWhite)) {    // 不正な属性名
+                throw new HTMLParseError((`Unexcepted character: ` ~ html.take(10).array.toUTF8()).idup);
+            }
+            value.put(html.front);
+            html.popFront();
+        }
+
+        if (dem) {
+            if (html.front == dem) {
+                html.popFront();
+            } else {
+                throw new HTMLParseError((`Unexcepted character: ` ~ html.take(10).array.toUTF8() ~ `, excepted: ` ~ [dem].toUTF8()).idup);
+            }
+        }
+
+        return value.data.toUTF8();
+    }
+
     while (!html.empty) {
         if (html.front == '<') { // タグ or コメント開始
             html.popFront();
@@ -125,18 +166,44 @@ HTMLElement parseHTML(S)(S html) if (isInputRange!S && is(ElementType!S == dchar
             if (html.front.isAlphaNum) { // タグ名
                 auto tagName = parseTagName();
 
-                if (html.front.isWhite) { // 属性あり？
-                    assert(0);
-                } else {
-                    auto element = new HTMLElement(tagName);
-                    if (root is null) {
-                        root = element;
+                auto element = new HTMLElement(tagName);
+
+                while (html.front != '>') { //  属性あるかも
+                    while (html.front.isWhite) { // 0個以上の空白
+                        html.popFront();
                     }
-                    if (p !is null) {
-                        p.appendChild(element);
+
+                    auto key = parseAttributeKey();
+
+                    while (html.front.isWhite) { // 0個以上の空白
+                        html.popFront();
                     }
-                    p = element;
+
+                    string value;
+                    if (html.front == '=') {    // 属性値あり
+                        html.popFront();
+                        while (html.front.isWhite) { // 0個以上の空白
+                            html.popFront();
+                        }
+
+                        value = parseAttributeValue();
+                    }
+                    element.attributes[key] = value;
+
+                    while (html.front.isWhite) { // 0個以上の空白
+                        html.popFront();
+                    }
                 }
+
+                assert(html.front == '>');  // タグ終了
+
+                if (root is null) {
+                    root = element;
+                }
+                if (p !is null) {
+                    p.appendChild(element);
+                }
+                p = element;
             } else if (html.front == '/') {  // 終了タグ
                 html.popFront();
 
@@ -175,4 +242,16 @@ unittest {
     assert(div.children.length == 1);
     assert(equal(div.children[0].tag, "div"));
     assert(div.children[0].parent is div);
+}
+///
+unittest {
+    auto div = parseHTML(`<div id=foo class="bar foobar" data-number=0 data-char='c'></div>`);
+    assert(div !is null);
+    assert(equal(div.tag, "div"));
+    assert(div.children.length == 0);
+    assert(div.attributes.keys.length == 4);
+    assert(equal(div.attributes["id"], "foo"));
+    assert(equal(div.attributes["class"], "bar foobar"));
+    assert(equal(div.attributes["data-number"], "0"));
+    assert(equal(div.attributes["data-char"], "c"));
 }

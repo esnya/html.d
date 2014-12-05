@@ -105,6 +105,7 @@ class HTMLParseError : Exception {
 /// パース
 HTMLElement parseHTML(S)(S html) if (isInputRange!S && is(ElementType!S == dchar)) {
     HTMLElement root;
+    HTMLElement p;
 
     auto parseTagName() {
         auto c = html.front;
@@ -131,6 +132,10 @@ HTMLElement parseHTML(S)(S html) if (isInputRange!S && is(ElementType!S == dchar
                     if (root is null) {
                         root = element;
                     }
+                    if (p !is null) {
+                        p.appendChild(element);
+                    }
+                    p = element;
                 }
             } else if (html.front == '/') {  // 終了タグ
                 html.popFront();
@@ -162,4 +167,12 @@ unittest {
     assert(div !is null);
     assert(equal(div.tag, "div"));
     assert(div.children.length == 0);
+}
+///
+unittest {
+    auto div = parseHTML("<div><div></div></div>");
+    assert(div !is null);
+    assert(div.children.length == 1);
+    assert(equal(div.children[0].tag, "div"));
+    assert(div.children[0].parent is div);
 }

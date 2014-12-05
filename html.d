@@ -26,21 +26,22 @@ class HTMLElement {
     }
     ///
     unittest {
-        /// create
-        auto e1 = new HTMLElement("div");
-        assert(equal(e1.tag, "div"));
-
+        auto div = new HTMLElement("div");
+        assert(equal(div.tag, "div"));
+    }
+    ///
+    unittest {
         string[string] attributes;
         attributes["id"] = "id";
         attributes["href"] = "#";
 
-        /// with attributes
-        auto e2 = new HTMLElement("a", attributes);
-        assert(equal(e2.attributes.keys, attributes.keys));
-        assert(equal(e2.attributes.values, attributes.values));
-
-        // with text
-        auto e3 = new HTMLElement("span", "text");
-        assert(equal(e3.text, "text"));
+        auto a = new HTMLElement("a", attributes);
+        assert(equal(a.attributes.keys, attributes.keys));
+        assert(equal(a.attributes.values, attributes.values));
+    }
+    ///
+    unittest {
+        auto span = new HTMLElement("span", "text");
+        assert(equal(span.text, "text"));
     }
 }

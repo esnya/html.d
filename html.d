@@ -2,6 +2,7 @@
 module html;
 
 import std.algorithm;
+import std.range;
 
 /// 
 class HTMLElement {
@@ -51,6 +52,7 @@ class HTMLElement {
     /// 子要素を追加
     void appendChild(HTMLElement element) {
         children ~= element;
+        element._parent = this;
     }
     ///
     unittest {
@@ -71,5 +73,21 @@ class HTMLElement {
         assert(equal(ol.children, [i1, i2]));
         assert(equal(i1.children, [a1]));
         assert(equal(i2.children, [a2]));
+    }
+
+    protected HTMLElement _parent;
+    /// 親を取得
+    @property HTMLElement parent() {
+        return _parent;
+    }
+    ///
+    unittest {
+        auto parent = new HTMLElement("div");
+        auto child = new HTMLElement("div");
+
+        parent.appendChild(child);
+
+        assert(parent.parent is null);
+        assert(child.parent is parent);
     }
 }

@@ -2,7 +2,10 @@
 module html;
 
 import std.algorithm;
+import std.array;
+import std.ascii;
 import std.range;
+import std.utf;
 
 /// 
 class HTMLElement {
@@ -90,4 +93,73 @@ class HTMLElement {
         assert(parent.parent is null);
         assert(child.parent is parent);
     }
+}
+
+/// パース時に発生する例外
+class HTMLParseError : Exception {
+    this(string msg, string file = __FILE__, uint line = __LINE__) {
+        super(msg, file, line);
+    }
+}
+
+/// パース
+HTMLElement parseHTML(S)(S html) if (isInputRange!S && is(ElementType!S == dchar)) {
+    HTMLElement root;
+
+    auto parseTagName() {
+        auto c = html.front;
+        auto name = appender!(ElementType!S[]);
+        while (c.isAlphaNum) {
+            name.put(c);
+            html.popFront();
+            c = html.front;
+        }
+        return name.data.toUTF8();
+    }
+
+    while (!html.empty) {
+        if (html.front == '<') { // タグ or コメント開始
+            html.popFront();
+
+            if (html.front.isAlphaNum) { // タグ名
+                auto tagName = parseTagName();
+
+                if (html.front.isWhite) { // 属性あり？
+                    assert(0);
+                } else {
+                    auto element = new HTMLElement(tagName);
+                    if (root is null) {
+                        root = element;
+                    }
+                }
+            } else if (html.front == '/') {  // 終了タグ
+                html.popFront();
+
+                auto tagName = parseTagName();
+
+                while (html.front.isWhite) {
+                    html.popFront();
+                }
+
+                if (html.front != '>') {    // ">" が必要
+                    throw new HTMLParseError((`Unexcepted character: "` ~ [html.front].toUTF8() ~ `" excepted ">"`).idup);
+                }
+            } else {
+                throw new HTMLParseError(("Unexcepted character: " ~ [html.front].toUTF8()).idup);
+            }
+        } else {
+            throw new HTMLParseError(("Unexcepted character: " ~ [html.front].toUTF8()).idup);
+        }
+
+        html.popFront();
+    }
+
+    return root;
+}
+///
+unittest {
+    auto div = parseHTML("<div></div>");
+    assert(div !is null);
+    assert(equal(div.tag, "div"));
+    assert(div.children.length == 0);
 }
